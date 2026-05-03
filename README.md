@@ -62,7 +62,7 @@ maybe that is enough.
 | ![Screenshot 1](スクリーンショット%202026-05-02%20193122.png) | ![Screenshot 2](スクリーンショット%202026-05-02%20194548.png) | ![Screenshot 3](スクリーンショット%202026-05-02%20200840.png) |
 
 
-| :---: | :---: |
+
 | ![Screenshot 4](スクリーンショット%202026-05-02%20200932.png) | ![Screenshot 5](スクリーンショット%202026-05-02%20201025.png) |
 
 Made with quiet hands, in Japan.
