@@ -291,27 +291,6 @@
     gap: 1.25rem;
   }
 
-  #scene-future .future-audio-link {
-    font-size: 0.85rem;
-    font-weight: 300;
-    letter-spacing: 0.06em;
-    line-height: 1.5;
-    color: #fff;
-    text-decoration: none;
-    opacity: 0;
-    max-width: min(34em, 92vw);
-    transition: opacity 0.5s ease;
-    animation: futureLinkReveal 2s ease 6s forwards;
-  }
-
-  #scene-future .future-audio-link:hover {
-    opacity: 1;
-  }
-
-  @keyframes futureLinkReveal {
-    to { opacity: 0.6; }
-  }
-
   /* ============ Restart ============ */
   .restart {
     position: absolute;
@@ -343,28 +322,6 @@
     mix-blend-mode: overlay;
   }
 
-  /* ============ Sound toggle ============ */
-  .sound-toggle {
-    position: absolute;
-    top: 3vh;
-    right: 4vw;
-    background: transparent;
-    border: 1px solid rgba(245, 239, 227, 0.2);
-    color: #8a8578;
-    font-family: inherit;
-    font-size: 0.65rem;
-    letter-spacing: 0.25em;
-    padding: 0.5rem 0.9rem;
-    cursor: pointer;
-    z-index: 50;
-    transition: all 0.3s ease;
-    border-radius: 2px;
-    text-transform: lowercase;
-  }
-  .sound-toggle:hover {
-    color: #f5efe3;
-    border-color: rgba(245, 239, 227, 0.5);
-  }
 </style>
 </head>
 <body>
@@ -416,17 +373,10 @@
     </div>
     <div class="future-footer">
       <div class="bottom">— earth day, 2026</div>
-      <a
-        class="future-audio-link"
-        href="https://stand.fm/episodes/69e5c191a1cca69f435827c4"
-        target="_blank"
-        rel="noopener noreferrer"
-      >🎵 Listen to &quot;Spinning Globe&quot; — my acapella</a>
     </div>
   </div>
 
   <button class="restart" id="restart-btn">back</button>
-  <button class="sound-toggle" id="sound-btn">sound off</button>
   <div class="grain"></div>
 </div>
 
@@ -479,92 +429,6 @@ function getIdealCameraZ(scene) {
   }
   return base;
 }
-
-// ============ Audio (Tone.js-less ambient) ============
-let audioCtx;
-let masterGain;
-let soundOn = false;
-let ambientNodes = [];
-
-function initAudio() {
-  if (audioCtx) return;
-  try {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0;
-    masterGain.connect(audioCtx.destination);
-  } catch(e) { console.log('audio unavailable'); }
-}
-
-function startAmbient() {
-  if (!audioCtx) return;
-  // Gentle drone: two detuned sine waves + slow LFO
-  const freqs = [110, 164.81, 220]; // A2, E3, A3
-  freqs.forEach((f, i) => {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    const lfo = audioCtx.createOscillator();
-    const lfoGain = audioCtx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.value = f;
-
-    lfo.frequency.value = 0.1 + i * 0.05;
-    lfoGain.gain.value = 0.015;
-    lfo.connect(lfoGain);
-    lfoGain.connect(gain.gain);
-
-    gain.gain.value = 0.04 - i * 0.01;
-    osc.connect(gain);
-    gain.connect(masterGain);
-    osc.start();
-    lfo.start();
-    ambientNodes.push(osc, lfo);
-  });
-  // Fade in
-  masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
-  masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
-  masterGain.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + 3);
-}
-
-function playChime() {
-  if (!audioCtx || !soundOn) return;
-  const now = audioCtx.currentTime;
-  [523.25, 659.25, 783.99].forEach((freq, i) => { // C5 E5 G5
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0, now + i * 0.15);
-    gain.gain.linearRampToValueAtTime(0.08, now + i * 0.15 + 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 2);
-    osc.connect(gain);
-    gain.connect(masterGain);
-    osc.start(now + i * 0.15);
-    osc.stop(now + i * 0.15 + 2);
-  });
-}
-
-window.toggleSound = function() {
-  initAudio();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  soundOn = !soundOn;
-  const btn = document.getElementById('sound-btn');
-  if (soundOn) {
-    if (ambientNodes.length === 0) startAmbient();
-    else {
-      masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
-      masterGain.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + 1.5);
-    }
-    btn.textContent = 'sound on';
-  } else {
-    if (masterGain) {
-      masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
-      masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1);
-    }
-    btn.textContent = 'sound off';
-  }
-};
 
 // ============ Three.js setup ============
 function init() {
@@ -1007,8 +871,6 @@ function setupInteraction() {
     if (e) e.preventDefault();
     // Remove the tap layer so it doesn't block later interactions
     tapLayer.style.display = 'none';
-    initAudio();
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     goToZoom();
   };
   tapLayer.addEventListener('click', handleOpeningTap);
@@ -1115,8 +977,6 @@ window.sendThought = function() {
   msgEl.classList.remove('show');
   void msgEl.offsetWidth;
   msgEl.classList.add('show');
-
-  playChime();
 
   setTimeout(() => goToFuture(), 6000);
 };
@@ -1295,7 +1155,6 @@ function animate() {
 init();
 
 // Wire up all buttons (module scripts can't be called from onclick attrs)
-document.getElementById('sound-btn').addEventListener('click', toggleSound);
 document.getElementById('restart-btn').addEventListener('click', restart);
 document.getElementById('earth-next-btn').addEventListener('click', goToThink);
 document.getElementById('send-btn').addEventListener('click', sendThought);
