@@ -64,5 +64,6 @@ maybe that is enough.
 
 
 | ![Screenshot 4](スクリーンショット%202026-05-02%20200932.png) | ![Screenshot 5](スクリーンショット%202026-05-02%20201025.png) |
+<img src="flower.png" width="80%" alt="flower">
 
 Made with quiet hands, in Japan.
