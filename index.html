@@ -329,36 +329,74 @@
 
   #future-bg {
     position: fixed;
-    inset: 0;
+    inset: -12%;
     z-index: 1;
     pointer-events: none;
     background: #000000;
     opacity: 0;
-    transition: opacity 1.5s ease;
+    filter: blur(0);
+    transform: scale(1);
+    transition: opacity 1.5s ease, filter 2s ease, transform 2s ease;
   }
 
   #future-bg.active {
     opacity: 1;
+    filter: blur(72px);
+    transform: scale(1.1);
   }
 
-  /* ============ Restart ============ */
+  #future-bg-haze {
+    position: fixed;
+    inset: -25%;
+    z-index: 8;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(
+      ellipse 70% 60% at 50% 48%,
+      rgba(122, 63, 88, 0.55) 0%,
+      rgba(90, 48, 70, 0.28) 45%,
+      transparent 72%
+    );
+    filter: blur(40px);
+    transition: opacity 3s ease;
+  }
+
+  #future-bg-haze.active {
+    opacity: 1;
+  }
+
+  /* ============ Restart (final screen) ============ */
   .restart {
-    position: absolute;
-    bottom: 3vh;
-    left: 50%;
-    transform: translateX(-50%);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem 1.5rem calc(1.1rem + env(safe-area-inset-bottom, 0px));
     font-size: 0.7rem;
     letter-spacing: 0.3em;
     color: #c9c2b4;
-    background: none;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.35) 0%, transparent 100%);
     border: none;
     cursor: pointer;
     font-family: inherit;
     opacity: 0;
-    transition: opacity 0.5s ease, color 0.3s ease;
+    visibility: hidden;
+    transition: opacity 0.6s ease, color 0.3s ease, visibility 0s linear 0.6s;
     text-transform: lowercase;
+    pointer-events: none;
   }
-  .restart.show { opacity: 1; }
+
+  .restart.show {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.6s ease, color 0.3s ease, visibility 0s linear 0s;
+    pointer-events: auto;
+  }
+
   .restart:hover { color: #f5efe3; }
 
   /* ============ Grain overlay ============ */
@@ -378,6 +416,7 @@
 
 <div id="app">
   <div id="future-bg" aria-hidden="true"></div>
+  <div id="future-bg-haze" aria-hidden="true"></div>
   <canvas id="canvas"></canvas>
 
   <!-- Scene 1: Opening -->
@@ -464,7 +503,7 @@ const FUTURE_BG_COLORS = [
   { t: 0.25, hex: 0x3d2458 },
   { t: 0.5, hex: 0x141f38 },
   { t: 0.75, hex: 0x1e3d6e },
-  { t: 1, hex: 0xb85a7a }
+  { t: 1, hex: 0x7a3f58 }
 ];
 
 const MEET_WORDS = [
@@ -545,6 +584,10 @@ function resetFutureScene() {
   }
   futureBg.classList.remove('active');
   futureBg.style.background = '#000000';
+  futureBg.style.filter = '';
+  futureBg.style.transform = '';
+  const futureHaze = document.getElementById('future-bg-haze');
+  if (futureHaze) futureHaze.classList.remove('active');
   renderer.setClearColor(0x000000, 1);
   if (scene.fog) scene.fog.color.setHex(0x000000);
 }
@@ -1219,6 +1262,7 @@ function updateFutureMeetPosition() {
 
 function animateFutureBackground(durationMs) {
   const bgEl = document.getElementById('future-bg');
+  const hazeEl = document.getElementById('future-bg-haze');
   bgEl.classList.add('active');
   const start = performance.now();
 
@@ -1226,11 +1270,20 @@ function animateFutureBackground(durationMs) {
     if (currentScene !== 'future') return;
     const progress = Math.min((now - start) / durationMs, 1);
     const color = sampleFutureBgColor(progress);
-    const top = rgbCss(color);
-    const bottom = rgbCss(lerpHex(color, 0xffffff, 0.12));
-    bgEl.style.background = `linear-gradient(165deg, ${top} 0%, ${bottom} 100%)`;
-    renderer.setClearColor(color, 1);
-    if (scene.fog) scene.fog.color.setHex(color);
+    const soft = lerpHex(color, 0x5a3040, 0.22);
+    const edge = lerpHex(color, 0x000000, 0.18);
+    const top = rgbCss(soft);
+    const mid = rgbCss(color);
+    const bottom = rgbCss(edge);
+    bgEl.style.background = `radial-gradient(ellipse 95% 85% at 50% 46%, ${mid} 0%, ${top} 52%, ${bottom} 100%)`;
+    renderer.setClearColor(soft, 1);
+    if (scene.fog) scene.fog.color.setHex(soft);
+
+    if (hazeEl) {
+      const hazeOn = progress > 0.55;
+      hazeEl.classList.toggle('active', hazeOn);
+      hazeEl.style.opacity = hazeOn ? String(Math.min((progress - 0.55) / 0.35, 1) * 0.85) : '0';
+    }
 
     const meetEl = document.getElementById('future-meet');
     if (meetEl.classList.contains('is-active')) {
@@ -1272,18 +1325,13 @@ function revealMeetWords() {
   });
 
   animateFutureBackground((totalDuration + 800) * 3);
-
-  scheduleFuture(() => {
-    if (currentScene !== 'future') return;
-    document.querySelector('.restart').classList.add('show');
-  }, totalDuration + 2500);
 }
 
 window.goToFuture = function() {
   showScene('future');
   cameraTargetZ = getIdealCameraZ('future');
   resetFutureScene();
-  document.querySelector('.restart').classList.remove('show');
+  document.getElementById('restart-btn').classList.add('show');
 
   const futureEl = document.getElementById('future-text');
   const futureTop = document.querySelector('#scene-future .top');
@@ -1306,7 +1354,7 @@ window.goToFuture = function() {
 };
 
 window.restart = function() {
-  document.querySelector('.restart').classList.remove('show');
+  document.getElementById('restart-btn').classList.remove('show');
   resetFutureScene();
   document.getElementById('name-input').value = '';
   // Clear thought lights
