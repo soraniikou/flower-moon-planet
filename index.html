@@ -255,6 +255,17 @@
     padding: 10vh 2rem;
   }
 
+  #scene-future .future-stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 36rem;
+    min-height: 28vh;
+    position: relative;
+  }
+
   #scene-future .top {
     font-size: clamp(0.85rem, 3vw, 1.1rem);
     letter-spacing: 0.3em;
@@ -278,18 +289,31 @@
   }
 
   #scene-future .future-meet {
-    font-size: clamp(1rem, 3.6vw, 1.35rem);
-    font-weight: 300;
-    letter-spacing: 0.2em;
-    line-height: 2;
-    max-width: 32ch;
-    color: #f5efe3;
-    min-height: 3em;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 15;
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
     justify-content: center;
-    gap: 0.35em 0.5em;
+    flex-wrap: wrap;
+    gap: 0.2em 0.45em;
+    font-size: clamp(0.95rem, 3.4vw, 1.3rem);
+    font-weight: 300;
+    letter-spacing: 0.18em;
+    line-height: 2;
+    width: min(92vw, 34rem);
+    padding: 0 1rem;
+    color: #f5efe3;
+    text-shadow: 0 0 28px rgba(0, 0, 0, 0.55);
     opacity: 1;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  #scene-future .future-meet.is-active {
+    visibility: visible;
   }
 
   #scene-future .future-meet .word {
@@ -395,10 +419,12 @@
   <!-- Scene 6: Future -->
   <div class="overlay" id="scene-future">
     <div class="top">one year, ten years, a thousand years from now —</div>
+    <div class="future-stage">
     <div class="center" id="future-text">
       perhaps the Earth<br>has grown<br>a little kinder
     </div>
-    <div class="center future-meet" id="future-meet" aria-live="polite"></div>
+    </div>
+    <div class="future-meet" id="future-meet" aria-live="polite"></div>
   </div>
 
   <button class="restart" id="restart-btn">back</button>
@@ -431,13 +457,14 @@ let arcLines = [];
 let openingTriggered = false;
 let futureTimers = [];
 let futureBgRaf = null;
+const earthCenterScreen = new THREE.Vector3();
 
 const FUTURE_BG_COLORS = [
   { t: 0, hex: 0x000000 },
   { t: 0.25, hex: 0x3d2458 },
   { t: 0.5, hex: 0x141f38 },
   { t: 0.75, hex: 0x1e3d6e },
-  { t: 1, hex: 0xf0c8dc }
+  { t: 1, hex: 0xb85a7a }
 ];
 
 const MEET_WORDS = [
@@ -505,8 +532,13 @@ function resetFutureScene() {
   const futureBg = document.getElementById('future-bg');
   futureText.style.opacity = '0';
   futureText.style.display = '';
+  futureText.style.visibility = '';
   futureText.innerHTML = 'perhaps the Earth<br>has grown<br>a little kinder';
   futureMeet.innerHTML = '';
+  futureMeet.classList.remove('is-active');
+  futureMeet.style.color = '';
+  futureMeet.style.left = '50%';
+  futureMeet.style.top = '50%';
   if (futureTop) {
     futureTop.style.opacity = '';
     futureTop.style.transition = '';
@@ -1171,6 +1203,20 @@ function createGlowTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
+function updateFutureMeetPosition() {
+  const meetEl = document.getElementById('future-meet');
+  if (!meetEl?.classList.contains('is-active') || currentScene !== 'future' || !earth) return;
+
+  earthCenterScreen.set(0, 0, 0);
+  earth.localToWorld(earthCenterScreen);
+  earthCenterScreen.project(camera);
+
+  const x = (earthCenterScreen.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-earthCenterScreen.y * 0.5 + 0.5) * window.innerHeight;
+  meetEl.style.left = `${x}px`;
+  meetEl.style.top = `${y}px`;
+}
+
 function animateFutureBackground(durationMs) {
   const bgEl = document.getElementById('future-bg');
   bgEl.classList.add('active');
@@ -1186,6 +1232,12 @@ function animateFutureBackground(durationMs) {
     renderer.setClearColor(color, 1);
     if (scene.fog) scene.fog.color.setHex(color);
 
+    const meetEl = document.getElementById('future-meet');
+    if (meetEl.classList.contains('is-active')) {
+      const textColor = lerpHex(0xf5efe3, 0xf0dce6, Math.max(0, (progress - 0.5) / 0.5));
+      meetEl.style.color = rgbCss(textColor);
+    }
+
     if (progress < 1) {
       futureBgRaf = requestAnimationFrame(tick);
     } else {
@@ -1197,9 +1249,12 @@ function animateFutureBackground(durationMs) {
 
 function revealMeetWords() {
   const futureEl = document.getElementById('future-text');
-  futureEl.style.display = 'none';
+  futureEl.style.visibility = 'hidden';
   const meetEl = document.getElementById('future-meet');
   meetEl.innerHTML = '';
+  meetEl.classList.add('is-active');
+  meetEl.style.color = '#f5efe3';
+  updateFutureMeetPosition();
   let elapsed = 0;
   let totalDuration = 0;
 
@@ -1216,7 +1271,7 @@ function revealMeetWords() {
     }, elapsed);
   });
 
-  animateFutureBackground(totalDuration + 800);
+  animateFutureBackground((totalDuration + 800) * 3);
 
   scheduleFuture(() => {
     if (currentScene !== 'future') return;
@@ -1313,6 +1368,7 @@ function animate() {
     a.line.material.opacity = Math.min(age / 1.2, 1) * (0.5 + Math.sin(age * 1.5) * 0.2);
   });
 
+  updateFutureMeetPosition();
   renderer.render(scene, camera);
 }
 
