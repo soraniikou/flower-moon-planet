@@ -32,6 +32,7 @@
     display: block;
     position: absolute;
     inset: 0;
+    z-index: 2;
   }
 
   /* ============ UI Overlays ============ */
@@ -260,6 +261,7 @@
     color: #8a8578;
     opacity: 0;
     animation: fadeIn 2s ease forwards;
+    transition: opacity 2.5s ease;
     font-family: 'Cormorant Garamond', serif;
     font-style: italic;
   }
@@ -272,23 +274,47 @@
     max-width: 22ch;
     color: #f5efe3;
     opacity: 0;
-    animation: fadeIn 3s ease 1.5s forwards;
+    transition: opacity 2.5s ease;
   }
 
-  #scene-future .bottom {
-    font-size: 0.75rem;
-    letter-spacing: 0.4em;
-    color: #6a6558;
-    opacity: 0;
-    animation: fadeIn 2s ease 5s forwards;
-    text-transform: lowercase;
-  }
-
-  #scene-future .future-footer {
+  #scene-future .future-meet {
+    font-size: clamp(1rem, 3.6vw, 1.35rem);
+    font-weight: 300;
+    letter-spacing: 0.2em;
+    line-height: 2;
+    max-width: 32ch;
+    color: #f5efe3;
+    min-height: 3em;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.25rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35em 0.5em;
+    opacity: 1;
+  }
+
+  #scene-future .future-meet .word {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 1.2s ease, transform 1.2s ease;
+  }
+
+  #scene-future .future-meet .word.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  #future-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: #000000;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+  }
+
+  #future-bg.active {
+    opacity: 1;
   }
 
   /* ============ Restart ============ */
@@ -327,6 +353,7 @@
 <body>
 
 <div id="app">
+  <div id="future-bg" aria-hidden="true"></div>
   <canvas id="canvas"></canvas>
 
   <!-- Scene 1: Opening -->
@@ -371,9 +398,7 @@
     <div class="center" id="future-text">
       perhaps the Earth<br>has grown<br>a little kinder
     </div>
-    <div class="future-footer">
-      <div class="bottom">— earth day, 2026</div>
-    </div>
+    <div class="center future-meet" id="future-meet" aria-live="polite"></div>
   </div>
 
   <button class="restart" id="restart-btn">back</button>
@@ -404,6 +429,93 @@ let scrollPhase = 0; // 0 = far, 1 = close
 let thoughtLights = [];
 let arcLines = [];
 let openingTriggered = false;
+let futureTimers = [];
+let futureBgRaf = null;
+
+const FUTURE_BG_COLORS = [
+  { t: 0, hex: 0x000000 },
+  { t: 0.25, hex: 0x3d2458 },
+  { t: 0.5, hex: 0x141f38 },
+  { t: 0.75, hex: 0x1e3d6e },
+  { t: 1, hex: 0xf0c8dc }
+];
+
+const MEET_WORDS = [
+  { text: 'Everything', gap: 0 },
+  { text: 'happened', gap: 700 },
+  { text: 'just', gap: 900 },
+  { text: 'so', gap: 1100 },
+  { text: 'I', gap: 1100 },
+  { text: 'could', gap: 800 },
+  { text: 'meet', gap: 800 },
+  { text: 'you.', gap: 700 }
+];
+
+function hexToRgb(hex) {
+  return {
+    r: (hex >> 16) & 255,
+    g: (hex >> 8) & 255,
+    b: hex & 255
+  };
+}
+
+function lerpHex(a, b, t) {
+  const c1 = hexToRgb(a);
+  const c2 = hexToRgb(b);
+  const r = Math.round(c1.r + (c2.r - c1.r) * t);
+  const g = Math.round(c1.g + (c2.g - c1.g) * t);
+  const bl = Math.round(c1.b + (c2.b - c1.b) * t);
+  return (r << 16) | (g << 8) | bl;
+}
+
+function rgbCss(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function sampleFutureBgColor(progress) {
+  const p = Math.max(0, Math.min(1, progress));
+  for (let i = 0; i < FUTURE_BG_COLORS.length - 1; i++) {
+    const a = FUTURE_BG_COLORS[i];
+    const b = FUTURE_BG_COLORS[i + 1];
+    if (p >= a.t && p <= b.t) {
+      const local = (p - a.t) / (b.t - a.t);
+      return lerpHex(a.hex, b.hex, local);
+    }
+  }
+  return FUTURE_BG_COLORS[FUTURE_BG_COLORS.length - 1].hex;
+}
+
+function clearFutureTimers() {
+  futureTimers.forEach(id => clearTimeout(id));
+  futureTimers = [];
+  if (futureBgRaf) cancelAnimationFrame(futureBgRaf);
+  futureBgRaf = null;
+}
+
+function scheduleFuture(fn, ms) {
+  futureTimers.push(setTimeout(fn, ms));
+}
+
+function resetFutureScene() {
+  clearFutureTimers();
+  const futureText = document.getElementById('future-text');
+  const futureMeet = document.getElementById('future-meet');
+  const futureTop = document.querySelector('#scene-future .top');
+  const futureBg = document.getElementById('future-bg');
+  futureText.style.opacity = '0';
+  futureText.style.display = '';
+  futureText.innerHTML = 'perhaps the Earth<br>has grown<br>a little kinder';
+  futureMeet.innerHTML = '';
+  if (futureTop) {
+    futureTop.style.opacity = '';
+    futureTop.style.transition = '';
+  }
+  futureBg.classList.remove('active');
+  futureBg.style.background = '#000000';
+  renderer.setClearColor(0x000000, 1);
+  if (scene.fog) scene.fog.color.setHex(0x000000);
+}
 
 function getIdealCameraZ(scene) {
   const w = window.innerWidth;
@@ -1059,36 +1171,88 @@ function createGlowTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
+function animateFutureBackground(durationMs) {
+  const bgEl = document.getElementById('future-bg');
+  bgEl.classList.add('active');
+  const start = performance.now();
+
+  const tick = (now) => {
+    if (currentScene !== 'future') return;
+    const progress = Math.min((now - start) / durationMs, 1);
+    const color = sampleFutureBgColor(progress);
+    const top = rgbCss(color);
+    const bottom = rgbCss(lerpHex(color, 0xffffff, 0.12));
+    bgEl.style.background = `linear-gradient(165deg, ${top} 0%, ${bottom} 100%)`;
+    renderer.setClearColor(color, 1);
+    if (scene.fog) scene.fog.color.setHex(color);
+
+    if (progress < 1) {
+      futureBgRaf = requestAnimationFrame(tick);
+    } else {
+      futureBgRaf = null;
+    }
+  };
+  futureBgRaf = requestAnimationFrame(tick);
+}
+
+function revealMeetWords() {
+  const futureEl = document.getElementById('future-text');
+  futureEl.style.display = 'none';
+  const meetEl = document.getElementById('future-meet');
+  meetEl.innerHTML = '';
+  let elapsed = 0;
+  let totalDuration = 0;
+
+  MEET_WORDS.forEach((item, index) => {
+    elapsed += item.gap;
+    totalDuration = elapsed + 1200;
+    scheduleFuture(() => {
+      if (currentScene !== 'future') return;
+      const span = document.createElement('span');
+      span.className = 'word';
+      span.textContent = item.text;
+      meetEl.appendChild(span);
+      requestAnimationFrame(() => span.classList.add('show'));
+    }, elapsed);
+  });
+
+  animateFutureBackground(totalDuration + 800);
+
+  scheduleFuture(() => {
+    if (currentScene !== 'future') return;
+    document.querySelector('.restart').classList.add('show');
+  }, totalDuration + 2500);
+}
+
 window.goToFuture = function() {
   showScene('future');
   cameraTargetZ = getIdealCameraZ('future');
-  // Cycle future texts
-  const futureEl = document.getElementById('future-text');
-  const futures = [
-    'perhaps the Earth<br>has grown<br>a little kinder',
-    'The moment you thought of someone, even briefly,<br>changes the world.'
-  ];
-  let i = 0;
-  const cycle = () => {
-    if (currentScene !== 'future') return;
-    futureEl.style.opacity = 0;
-    setTimeout(() => {
-      futureEl.innerHTML = futures[i % futures.length];
-      futureEl.style.opacity = 1;
-      i++;
-    }, 1500);
-  };
-  setTimeout(cycle, 8000);
-  setTimeout(cycle, 16000);
+  resetFutureScene();
+  document.querySelector('.restart').classList.remove('show');
 
-  // Show restart
-  setTimeout(() => {
-    document.querySelector('.restart').classList.add('show');
-  }, 6000);
+  const futureEl = document.getElementById('future-text');
+  const futureTop = document.querySelector('#scene-future .top');
+
+  scheduleFuture(() => {
+    if (currentScene !== 'future') return;
+    futureEl.style.opacity = '1';
+  }, 400);
+
+  scheduleFuture(() => {
+    if (currentScene !== 'future') return;
+    futureEl.style.opacity = '0';
+    if (futureTop) futureTop.style.opacity = '0';
+  }, 7900);
+
+  scheduleFuture(() => {
+    if (currentScene !== 'future') return;
+    revealMeetWords();
+  }, 10400);
 };
 
 window.restart = function() {
   document.querySelector('.restart').classList.remove('show');
+  resetFutureScene();
   document.getElementById('name-input').value = '';
   // Clear thought lights
   thoughtLights.forEach(t => glowGroup.remove(t.sprite));
