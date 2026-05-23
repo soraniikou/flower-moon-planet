@@ -438,7 +438,7 @@
   <!-- Scene 1: Opening -->
   <div class="overlay active" id="scene-opening">
     <div class="line1"></div>
-    <div class="line2">— what are you doing right now</div>
+    <div class="line2">— what are you doing right now?</div>
     <div class="tap-hint">tap to begin</div>
   </div>
   <div id="tap-layer"></div>
@@ -526,8 +526,8 @@ const FUTURE_BG_COLORS = [
 ];
 
 const MEET_LINES = [
-  'Everything led me to meet my',
-  'everything'
+  'Everything led me to meet',
+  'my everything'
 ];
 const MEET_CHAR_GAP = 285;
 
@@ -649,7 +649,7 @@ function getIdealCameraZ(scene) {
   return base;
 }
 
-const SHOOTING_STAR_INTERVAL = 7;
+const SHOOTING_STAR_INTERVAL = 14;
 
 function createShootingStarTexture() {
   if (shootingStarTexture) return shootingStarTexture;
@@ -662,11 +662,11 @@ function createShootingStarTexture() {
 
   const lg = ctx.createLinearGradient(0, 0, w, 0);
   lg.addColorStop(0, 'rgba(255,255,255,0)');
-  lg.addColorStop(0.1, 'rgba(220,230,255,0.2)');
-  lg.addColorStop(0.35, 'rgba(240,248,255,0.55)');
-  lg.addColorStop(0.6, 'rgba(255,255,255,0.85)');
-  lg.addColorStop(0.82, 'rgba(255,255,255,0.95)');
-  lg.addColorStop(1, 'rgba(255,255,255,1)');
+  lg.addColorStop(0.1, 'rgba(200,210,240,0.12)');
+  lg.addColorStop(0.35, 'rgba(220,228,245,0.38)');
+  lg.addColorStop(0.6, 'rgba(235,240,250,0.62)');
+  lg.addColorStop(0.82, 'rgba(245,248,255,0.78)');
+  lg.addColorStop(1, 'rgba(255,255,255,0.88)');
   ctx.fillStyle = lg;
   ctx.fillRect(0, 0, w, h);
 
@@ -717,7 +717,7 @@ function spawnShootingStar() {
   const geo = new THREE.PlaneGeometry(trailLen, 0.55);
   const mat = new THREE.MeshBasicMaterial({
     map: createShootingStarTexture(),
-    color: 0xffffff,
+    color: 0xd8dce8,
     transparent: true,
     opacity: 0,
     blending: THREE.AdditiveBlending,
@@ -754,7 +754,7 @@ function updateShootingStars(dt) {
     s.life += dt;
     s.mesh.position.addScaledVector(s.dir, s.speed * dt);
 
-    let opacity = 1;
+    let opacity = 0.72;
     if (s.life < s.fadeIn) opacity *= s.life / s.fadeIn;
     else if (s.life > s.maxLife - s.fadeOut) {
       opacity *= Math.max(0, (s.maxLife - s.life) / s.fadeOut);
@@ -1277,7 +1277,7 @@ window.goToZoom = function() {
 
   // Animate earth scale
   const startTime = performance.now();
-  const duration = 20000;
+  const duration = 40000;
   const animateScale = () => {
     const t = Math.min((performance.now() - startTime) / duration, 1);
     const eased = 1 - Math.pow(1 - t, 3);
