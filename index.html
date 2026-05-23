@@ -1117,7 +1117,7 @@ window.goToZoom = function() {
 
   // Animate earth scale
   const startTime = performance.now();
-  const duration = 10000;
+  const duration = 20000;
   const animateScale = () => {
     const t = Math.min((performance.now() - startTime) / duration, 1);
     const eased = 1 - Math.pow(1 - t, 3);
