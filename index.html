@@ -506,11 +506,8 @@ const FUTURE_BG_COLORS = [
   { t: 1, hex: 0x7a3f58 }
 ];
 
-const MEET_WORDS = [
-  { text: 'meet', gap: 0 },
-  { text: 'my', gap: 800 },
-  { text: 'everything', gap: 800 }
-];
+const MEET_MESSAGE = 'Everything led me to meet my everything';
+const MEET_CHAR_GAP = 95;
 
 function hexToRgb(hex) {
   return {
@@ -571,6 +568,7 @@ function resetFutureScene() {
   futureMeet.innerHTML = '';
   futureMeet.classList.remove('is-active');
   futureMeet.style.color = '';
+  futureMeet.style.gap = '';
   futureMeet.style.left = '50%';
   futureMeet.style.top = '50%';
   if (futureTop) {
@@ -1302,18 +1300,18 @@ function revealMeetWords() {
   meetEl.innerHTML = '';
   meetEl.classList.add('is-active');
   meetEl.style.color = '#f5efe3';
+  meetEl.style.gap = '0';
   updateFutureMeetPosition();
-  let elapsed = 0;
   let totalDuration = 0;
 
-  MEET_WORDS.forEach((item, index) => {
-    elapsed += item.gap;
+  [...MEET_MESSAGE].forEach((char, index) => {
+    const elapsed = index * MEET_CHAR_GAP;
     totalDuration = elapsed + 1200;
     scheduleFuture(() => {
       if (currentScene !== 'future') return;
       const span = document.createElement('span');
       span.className = 'word';
-      span.textContent = item.text;
+      span.textContent = char === ' ' ? '\u00A0' : char;
       meetEl.appendChild(span);
       requestAnimationFrame(() => span.classList.add('show'));
     }, elapsed);
