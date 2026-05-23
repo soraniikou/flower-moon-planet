@@ -498,7 +498,10 @@
 import * as THREE from 'three';
 
 // ============ Global state ============
-let scene, camera, renderer, earth, clouds, atmosphere, stars, glowGroup;
+let scene, camera, renderer, earth, clouds, atmosphere, stars, glowGroup, shootingStarsGroup;
+let shootingStars = [];
+let shootingStarTexture = null;
+let shootingStarTimer = 0;
 let rotationVelocity = 0;
 let targetRotationY = 0;
 let isDragging = false;
@@ -628,6 +631,125 @@ function getIdealCameraZ(scene) {
   return base;
 }
 
+const SHOOTING_STAR_INTERVAL = 7;
+
+function createShootingStarTexture() {
+  if (shootingStarTexture) return shootingStarTexture;
+  const w = 512;
+  const h = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  const lg = ctx.createLinearGradient(0, 0, w, 0);
+  lg.addColorStop(0, 'rgba(255,255,255,0)');
+  lg.addColorStop(0.12, 'rgba(210,220,255,0.04)');
+  lg.addColorStop(0.38, 'rgba(230,238,255,0.16)');
+  lg.addColorStop(0.62, 'rgba(245,248,255,0.38)');
+  lg.addColorStop(0.82, 'rgba(255,255,255,0.72)');
+  lg.addColorStop(1, 'rgba(255,255,255,1)');
+  ctx.fillStyle = lg;
+  ctx.fillRect(0, 0, w, h);
+
+  const vg = ctx.createLinearGradient(0, 0, 0, h);
+  vg.addColorStop(0, 'rgba(255,255,255,0)');
+  vg.addColorStop(0.15, 'rgba(255,255,255,0.7)');
+  vg.addColorStop(0.5, 'rgba(255,255,255,1)');
+  vg.addColorStop(0.85, 'rgba(255,255,255,0.7)');
+  vg.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, w, h);
+
+  shootingStarTexture = new THREE.CanvasTexture(canvas);
+  return shootingStarTexture;
+}
+
+function spawnShootingStar() {
+  if (!camera || !shootingStarsGroup) return;
+
+  const margin = 1.2;
+  const sx = (Math.random() - 0.5) * 2 * margin;
+  const sy = (Math.random() - 0.5) * 2 * margin;
+  const angle = Math.random() * Math.PI * 2;
+  const span = 1.1 + Math.random() * 1.1;
+  const ex = sx + Math.cos(angle) * span;
+  const ey = sy + Math.sin(angle) * span;
+  const depth = 110 + Math.random() * 90;
+
+  const ndcToWorld = (nx, ny) => {
+    const v = new THREE.Vector3(nx, ny, 0.5).unproject(camera);
+    return camera.position.clone().add(
+      v.sub(camera.position).normalize().multiplyScalar(depth)
+    );
+  };
+
+  const start = ndcToWorld(sx, sy);
+  const end = ndcToWorld(ex, ey);
+  const dir = end.clone().sub(start);
+  const travel = dir.length();
+  if (travel < 1) return;
+  dir.normalize();
+
+  const trailLen = 48 + Math.random() * 32;
+  const speed = 3.2 + Math.random() * 2.8;
+  const maxLife = (travel + trailLen * 0.6) / speed;
+
+  const geo = new THREE.PlaneGeometry(trailLen, 0.42);
+  const mat = new THREE.MeshBasicMaterial({
+    map: createShootingStarTexture(),
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(start);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
+  mesh.renderOrder = 1;
+  shootingStarsGroup.add(mesh);
+
+  shootingStars.push({
+    mesh,
+    dir,
+    speed,
+    life: 0,
+    maxLife,
+    fadeIn: 1.4,
+    fadeOut: 3
+  });
+}
+
+function updateShootingStars(dt) {
+  shootingStarTimer += dt;
+  if (shootingStarTimer >= SHOOTING_STAR_INTERVAL) {
+    shootingStarTimer = 0;
+    spawnShootingStar();
+  }
+
+  for (let i = shootingStars.length - 1; i >= 0; i--) {
+    const s = shootingStars[i];
+    s.life += dt;
+    s.mesh.position.addScaledVector(s.dir, s.speed * dt);
+
+    let opacity = 0.82;
+    if (s.life < s.fadeIn) opacity *= s.life / s.fadeIn;
+    else if (s.life > s.maxLife - s.fadeOut) {
+      opacity *= Math.max(0, (s.maxLife - s.life) / s.fadeOut);
+    }
+    s.mesh.material.opacity = opacity;
+
+    if (s.life >= s.maxLife) {
+      shootingStarsGroup.remove(s.mesh);
+      s.mesh.geometry.dispose();
+      s.mesh.material.dispose();
+      shootingStars.splice(i, 1);
+    }
+  }
+}
+
 // ============ Three.js setup ============
 function init() {
   const canvas = document.getElementById('canvas');
@@ -682,6 +804,10 @@ function init() {
   });
   stars = new THREE.Points(starGeo, starMat);
   scene.add(stars);
+
+  shootingStarsGroup = new THREE.Group();
+  scene.add(shootingStarsGroup);
+  createShootingStarTexture();
 
   // === Earth (procedural, no external textures) ===
   const earthGeo = new THREE.SphereGeometry(3, 128, 128);
@@ -1425,6 +1551,8 @@ function animate() {
 
   // Stars gentle rotation
   stars.rotation.y += 0.00005;
+
+  updateShootingStars(dt);
 
   // Thought lights: fade in, stay bright
   const now = performance.now();
