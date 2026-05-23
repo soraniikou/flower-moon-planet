@@ -314,6 +314,22 @@
 
   #scene-future .future-meet.is-active {
     visibility: visible;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 0.35em 0;
+  }
+
+  #scene-future .future-meet .meet-line {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0 0.45em;
+  }
+
+  #scene-future .future-meet .meet-word {
+    display: inline-flex;
+    white-space: nowrap;
   }
 
   #scene-future .future-meet .word {
@@ -506,8 +522,11 @@ const FUTURE_BG_COLORS = [
   { t: 1, hex: 0x7a3f58 }
 ];
 
-const MEET_MESSAGE = 'Everything led me to meet my everything';
-const MEET_CHAR_GAP = 95;
+const MEET_LINES = [
+  'Everything led me to meet my',
+  'everything'
+];
+const MEET_CHAR_GAP = 285;
 
 function hexToRgb(hex) {
   return {
@@ -568,7 +587,6 @@ function resetFutureScene() {
   futureMeet.innerHTML = '';
   futureMeet.classList.remove('is-active');
   futureMeet.style.color = '';
-  futureMeet.style.gap = '';
   futureMeet.style.left = '50%';
   futureMeet.style.top = '50%';
   if (futureTop) {
@@ -1300,19 +1318,31 @@ function revealMeetWords() {
   meetEl.innerHTML = '';
   meetEl.classList.add('is-active');
   meetEl.style.color = '#f5efe3';
-  meetEl.style.gap = '0';
   updateFutureMeetPosition();
-  let totalDuration = 0;
 
-  [...MEET_MESSAGE].forEach((char, index) => {
+  const charTargets = [];
+  MEET_LINES.forEach((lineText) => {
+    const lineEl = document.createElement('div');
+    lineEl.className = 'meet-line';
+    lineText.split(' ').forEach((word) => {
+      const wordEl = document.createElement('span');
+      wordEl.className = 'meet-word';
+      lineEl.appendChild(wordEl);
+      [...word].forEach((char) => charTargets.push({ char, parent: wordEl }));
+    });
+    meetEl.appendChild(lineEl);
+  });
+
+  let totalDuration = 0;
+  charTargets.forEach((item, index) => {
     const elapsed = index * MEET_CHAR_GAP;
     totalDuration = elapsed + 1200;
     scheduleFuture(() => {
       if (currentScene !== 'future') return;
       const span = document.createElement('span');
       span.className = 'word';
-      span.textContent = char === ' ' ? '\u00A0' : char;
-      meetEl.appendChild(span);
+      span.textContent = item.char;
+      item.parent.appendChild(span);
       requestAnimationFrame(() => span.classList.add('show'));
     }, elapsed);
   });
