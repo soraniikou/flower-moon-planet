@@ -606,6 +606,24 @@ function resetFutureScene() {
   if (scene.fog) scene.fog.color.setHex(0x000000);
 }
 
+function isDesktopViewport() {
+  return window.innerWidth >= 768;
+}
+
+function getThinkEarthScale() {
+  return isDesktopViewport() ? 0.9 : 1;
+}
+
+function applyEarthDisplayScale(scale) {
+  earth.scale.setScalar(scale);
+  clouds.scale.setScalar(scale);
+  atmosphere.scale.setScalar(scale);
+}
+
+function syncThinkEarthScale() {
+  if (currentScene === 'think') applyEarthDisplayScale(getThinkEarthScale());
+}
+
 function getIdealCameraZ(scene) {
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -644,10 +662,10 @@ function createShootingStarTexture() {
 
   const lg = ctx.createLinearGradient(0, 0, w, 0);
   lg.addColorStop(0, 'rgba(255,255,255,0)');
-  lg.addColorStop(0.12, 'rgba(210,220,255,0.04)');
-  lg.addColorStop(0.38, 'rgba(230,238,255,0.16)');
-  lg.addColorStop(0.62, 'rgba(245,248,255,0.38)');
-  lg.addColorStop(0.82, 'rgba(255,255,255,0.72)');
+  lg.addColorStop(0.1, 'rgba(220,230,255,0.2)');
+  lg.addColorStop(0.35, 'rgba(240,248,255,0.55)');
+  lg.addColorStop(0.6, 'rgba(255,255,255,0.85)');
+  lg.addColorStop(0.82, 'rgba(255,255,255,0.95)');
   lg.addColorStop(1, 'rgba(255,255,255,1)');
   ctx.fillStyle = lg;
   ctx.fillRect(0, 0, w, h);
@@ -676,7 +694,7 @@ function spawnShootingStar() {
   const span = 1.1 + Math.random() * 1.1;
   const ex = sx + Math.cos(angle) * span;
   const ey = sy + Math.sin(angle) * span;
-  const depth = 110 + Math.random() * 90;
+  const depth = Math.max(90, camera.position.z * 5 + 50) + Math.random() * 60;
 
   const ndcToWorld = (nx, ny) => {
     const v = new THREE.Vector3(nx, ny, 0.5).unproject(camera);
@@ -696,13 +714,15 @@ function spawnShootingStar() {
   const speed = 3.2 + Math.random() * 2.8;
   const maxLife = (travel + trailLen * 0.6) / speed;
 
-  const geo = new THREE.PlaneGeometry(trailLen, 0.42);
+  const geo = new THREE.PlaneGeometry(trailLen, 0.55);
   const mat = new THREE.MeshBasicMaterial({
     map: createShootingStarTexture(),
+    color: 0xffffff,
     transparent: true,
     opacity: 0,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    fog: false,
     side: THREE.DoubleSide
   });
   const mesh = new THREE.Mesh(geo, mat);
@@ -734,7 +754,7 @@ function updateShootingStars(dt) {
     s.life += dt;
     s.mesh.position.addScaledVector(s.dir, s.speed * dt);
 
-    let opacity = 0.82;
+    let opacity = 1;
     if (s.life < s.fadeIn) opacity *= s.life / s.fadeIn;
     else if (s.life > s.maxLife - s.fadeOut) {
       opacity *= Math.max(0, (s.maxLife - s.life) / s.fadeOut);
@@ -808,6 +828,8 @@ function init() {
   shootingStarsGroup = new THREE.Group();
   scene.add(shootingStarsGroup);
   createShootingStarTexture();
+  spawnShootingStar();
+  shootingStarTimer = 0;
 
   // === Earth (procedural, no external textures) ===
   const earthGeo = new THREE.SphereGeometry(3, 128, 128);
@@ -1216,6 +1238,7 @@ function onResize() {
   } else {
     cameraTargetZ = getIdealCameraZ(currentScene);
   }
+  syncThinkEarthScale();
 }
 
 // ============ Scene transitions ============
@@ -1278,6 +1301,7 @@ window.goToEarth = function() {
 window.goToThink = function() {
   showScene('think');
   cameraTargetZ = getIdealCameraZ('think');
+  applyEarthDisplayScale(getThinkEarthScale());
   setTimeout(() => {
     document.getElementById('name-input').focus();
   }, 500);
@@ -1298,6 +1322,7 @@ window.sendThought = function() {
 
   showScene('message');
   cameraTargetZ = getIdealCameraZ('message');
+  applyEarthDisplayScale(1);
   msgEl.classList.remove('show');
   void msgEl.offsetWidth;
   msgEl.classList.add('show');
